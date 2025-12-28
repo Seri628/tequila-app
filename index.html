@@ -3,37 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>テキーラカウンターPro</title>
+    <title>テキーラカウンターRealtime</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #1a1a1a; color: white; text-align: center; margin: 0; padding-bottom: 80px; }
-        
-        /* ヘッダー（目標設定） */
+        /* デザインは前回と同じ */
+        body { font-family: -apple-system, sans-serif; background-color: #1a1a1a; color: white; text-align: center; margin: 0; padding-bottom: 80px; }
         .header { background: #2c3e50; padding: 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .total-info { display: flex; justify-content: center; align-items: baseline; gap: 10px; }
         .remain-count { font-size: 3.5rem; font-weight: 800; color: #e74c3c; }
         .target-input-area { font-size: 0.9rem; color: #bdc3c7; margin-top: 5px; }
         input[type="number"] { width: 60px; padding: 5px; border-radius: 5px; border: none; font-size: 1rem; text-align: center; font-weight: bold; }
-
-        /* メンバーリスト */
         .members { padding: 15px; max-width: 600px; margin: 0 auto; }
         .card { background: #34495e; margin-bottom: 15px; padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        
         .card-left { text-align: left; }
         .member-name { font-size: 1.1rem; font-weight: bold; display: block; margin-bottom: 5px; }
         .member-count { font-size: 0.9rem; color: #f1c40f; }
-        
         .btn-add { background: #27ae60; border: none; color: white; width: 50px; height: 50px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; box-shadow: 0 3px 0 #1e8449; }
         .btn-add:active { transform: translateY(3px); box-shadow: none; }
-
-        /* 操作ボタンエリア */
         .controls { margin: 20px; display: flex; justify-content: center; gap: 10px; }
         .btn-ctrl { padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; }
         .btn-green { background: #06c755; color: white; }
         .btn-gray { background: #95a5a6; color: white; }
         .btn-red { background: #c0392b; color: white; }
-
-        /* 達成時の演出 */
         .celebration { background-color: #f1c40f !important; transition: 0.5s; }
         .celebration .remain-count { color: #fff; text-shadow: 2px 2px 0 #000; }
     </style>
@@ -52,40 +46,61 @@
     </div>
 
     <div class="members" id="members-container">
-        </div>
+        <p>読み込み中...</p>
+    </div>
 
     <div class="controls">
-        <button class="btn-ctrl btn-green" onclick="addMyself()">LINEの名前で参加</button>
+        <button class="btn-ctrl btn-green" onclick="addMyself()">LINEで参加</button>
         <button class="btn-ctrl btn-gray" onclick="addGuest()">ゲスト追加</button>
     </div>
     
     <div style="margin-top: 30px;">
-        <button class="btn-ctrl btn-red" onclick="resetAll()">リセット（飲み会終了）</button>
+        <button class="btn-ctrl btn-red" onclick="resetAll()">リセット</button>
     </div>
 
     <script>
+        // ▼▼ 設定エリア（ここを書き換える！） ▼▼
         const LIFF_ID = "2008790629-0ju0alVp"; 
         
-        // アプリのデータ構造
-        let appData = {
-            target: 30,
-            members: [] // { id: 1, name: "名前", count: 0 }
+        // さっきコピーした中身をここに貼り付けてください↓↓
+        const firebaseConfig = {apiKey: "AIzaSyA4RAxIsuLPd856yYcjkg2QlMRoOOnbpu4",
+  authDomain: "tequilacounter.firebaseapp.com",
+  databaseURL: "https://tequilacounter-default-rtdb.firebaseio.com",
+  projectId: "tequilacounter",
+  storageBucket: "tequilacounter.firebasestorage.app",
+  messagingSenderId: "658800119982",
+  appId: "1:658800119982:web:b9f4417a5474a3c2529d3f"
         };
+        // ▲▲ 設定エリア終了 ▲▲
 
-        // 初期化処理
+        // Firebase初期化
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+        
+        let appData = { target: 30, members: [] };
+
         async function main() {
-            // ローカルストレージからデータを読み込む
-            loadData();
+            // データベースの変更を監視（リアルタイム同期の肝）
+            db.ref('partyData').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    appData = data;
+                    if (!appData.members) appData.members = []; // 空の場合の対策
+                    render();
+                } else {
+                    // データが無いときは初期化
+                    saveData();
+                }
+            });
 
             await liff.init({ liffId: LIFF_ID });
             if (!liff.isLoggedIn()) {
                 liff.login();
             }
-            
-            render();
         }
 
-        // 画面描画
         function render() {
             document.getElementById('target-input').value = appData.target;
             const container = document.getElementById('members-container');
@@ -95,7 +110,6 @@
 
             appData.members.forEach((member, index) => {
                 totalDrunk += member.count;
-
                 const div = document.createElement('div');
                 div.className = 'card';
                 div.innerHTML = `
@@ -108,7 +122,6 @@
                 container.appendChild(div);
             });
 
-            // 残り杯数計算
             const remain = appData.target - totalDrunk;
             const header = document.getElementById('header-bg');
             const remainDisplay = document.getElementById('remain-display');
@@ -123,16 +136,18 @@
             }
         }
 
-        // ▼ アクション関数群
+        // ▼ アクション（DBに保存しにいく）
 
-        // 1. 飲む
-        function drink(index) {
-            appData.members[index].count++;
-            saveData();
-            render();
+        function saveData() {
+            // 変更内容をFirebaseに送信
+            db.ref('partyData').set(appData);
         }
 
-        // 2. LINEの名前で自分を追加
+        function drink(index) {
+            appData.members[index].count++;
+            saveData(); // ここで全員に同期される
+        }
+
         async function addMyself() {
             try {
                 const profile = await liff.getProfile();
@@ -142,59 +157,37 @@
             }
         }
 
-        // 3. ゲスト追加（手動）
         function addGuest() {
             addMemberToList(`メンバー ${appData.members.length + 1}`);
         }
 
-        // 共通追加ロジック
         function addMemberToList(name) {
-            // 重複チェック（簡易）
             const exists = appData.members.some(m => m.name === name);
             if (!exists) {
                 appData.members.push({ name: name, count: 0 });
                 saveData();
-                render();
             }
         }
 
-        // 4. 名前を変える
         function renameMember(index) {
-            const newName = prompt("新しい名前を入力:", appData.members[index].name);
+            const newName = prompt("新しい名前:", appData.members[index].name);
             if (newName) {
                 appData.members[index].name = newName;
                 saveData();
-                render();
             }
         }
 
-        // 5. 目標変更
         function updateTarget() {
             const val = document.getElementById('target-input').value;
             appData.target = parseInt(val);
             saveData();
-            render();
         }
 
-        // 6. 全リセット
         function resetAll() {
-            if(confirm("本当にリセットしますか？今の記録は消えます。")) {
+            if(confirm("全員のデータをリセットしますか？")) {
                 appData.members = [];
                 appData.target = 30;
                 saveData();
-                render();
-            }
-        }
-
-        // ▼ データ保存・読込（Local Storage）
-        function saveData() {
-            localStorage.setItem('tequila_data', JSON.stringify(appData));
-        }
-
-        function loadData() {
-            const saved = localStorage.getItem('tequila_data');
-            if (saved) {
-                appData = JSON.parse(saved);
             }
         }
 
