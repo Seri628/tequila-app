@@ -3,103 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>テキーラカウンター</title>
+    <title>テキーラカウンターPro</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #1a1a1a; color: white; text-align: center; margin: 0; padding-bottom: 50px; }
-        .header { background: #c0392b; padding: 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-        .remain-label { font-size: 0.9rem; opacity: 0.9; }
-        .remain-count { font-size: 4rem; font-weight: 800; line-height: 1; margin: 5px 0; }
-        .target-info { font-size: 0.9rem; opacity: 0.8; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #1a1a1a; color: white; text-align: center; margin: 0; padding-bottom: 80px; }
         
-        .members { padding: 20px; max-width: 600px; margin: 0 auto; }
-        .card { background: #333; margin-bottom: 15px; padding: 15px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .card-name { font-size: 1.2rem; font-weight: bold; }
-        .btn-add { background: #27ae60; border: none; color: white; width: 60px; height: 60px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 0 #1e8449; transition: all 0.1s; }
-        .btn-add:active { transform: translateY(4px); box-shadow: none; }
+        /* ヘッダー（目標設定） */
+        .header { background: #2c3e50; padding: 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .total-info { display: flex; justify-content: center; align-items: baseline; gap: 10px; }
+        .remain-count { font-size: 3.5rem; font-weight: 800; color: #e74c3c; }
+        .target-input-area { font-size: 0.9rem; color: #bdc3c7; margin-top: 5px; }
+        input[type="number"] { width: 60px; padding: 5px; border-radius: 5px; border: none; font-size: 1rem; text-align: center; font-weight: bold; }
+
+        /* メンバーリスト */
+        .members { padding: 15px; max-width: 600px; margin: 0 auto; }
+        .card { background: #34495e; margin-bottom: 15px; padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         
-        /* 達成時の演出用 */
-        .celebration { background-color: #f1c40f !important; color: #000; }
+        .card-left { text-align: left; }
+        .member-name { font-size: 1.1rem; font-weight: bold; display: block; margin-bottom: 5px; }
+        .member-count { font-size: 0.9rem; color: #f1c40f; }
+        
+        .btn-add { background: #27ae60; border: none; color: white; width: 50px; height: 50px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; box-shadow: 0 3px 0 #1e8449; }
+        .btn-add:active { transform: translateY(3px); box-shadow: none; }
+
+        /* 操作ボタンエリア */
+        .controls { margin: 20px; display: flex; justify-content: center; gap: 10px; }
+        .btn-ctrl { padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; }
+        .btn-green { background: #06c755; color: white; }
+        .btn-gray { background: #95a5a6; color: white; }
+        .btn-red { background: #c0392b; color: white; }
+
+        /* 達成時の演出 */
+        .celebration { background-color: #f1c40f !important; transition: 0.5s; }
+        .celebration .remain-count { color: #fff; text-shadow: 2px 2px 0 #000; }
     </style>
 </head>
 <body>
 
-    <div class="header" id="header">
-        <div class="remain-label">全員で残り</div>
-        <div class="remain-count" id="remain-display">--</div>
-        <div class="target-info">目標: <span id="target-display">--</span> 杯</div>
+    <div class="header" id="header-bg">
+        <div class="total-info">
+            <span>残り</span>
+            <span class="remain-count" id="remain-display">--</span>
+            <span>杯</span>
+        </div>
+        <div class="target-input-area">
+            目標設定: <input type="number" id="target-input" value="30" onchange="updateTarget()"> 杯
+        </div>
     </div>
 
     <div class="members" id="members-container">
         </div>
 
-    <script>
-        // ▼▼ 設定項目 ▼▼
-        const LIFF_ID = "2008790629-0ju0alVp"; // あなたのID
-        const TARGET = 30; // 目標杯数
-        const MEMBERS = ["メンバーA", "メンバーB", "メンバーC", "メンバーD"];
-        // ▲▲ 設定項目 ▲▲
+    <div class="controls">
+        <button class="btn-ctrl btn-green" onclick="addMyself()">LINEの名前で参加</button>
+        <button class="btn-ctrl btn-gray" onclick="addGuest()">ゲスト追加</button>
+    </div>
+    
+    <div style="margin-top: 30px;">
+        <button class="btn-ctrl btn-red" onclick="resetAll()">リセット（飲み会終了）</button>
+    </div>
 
-        let currentCount = 0;
+    <script>
+        const LIFF_ID = "2008790629-0ju0alVp"; 
+        
+        // アプリのデータ構造
+        let appData = {
+            target: 30,
+            members: [] // { id: 1, name: "名前", count: 0 }
+        };
 
         // 初期化処理
         async function main() {
+            // ローカルストレージからデータを読み込む
+            loadData();
+
             await liff.init({ liffId: LIFF_ID });
-            
-            // ログインしていなければログイン画面へ
             if (!liff.isLoggedIn()) {
                 liff.login();
-                return;
             }
             
-            // 自分のプロフィールを取得（誰が開いたかわかるように）
-            const profile = await liff.getProfile();
-            console.log("Logged in as:", profile.displayName);
-
-            renderMembers();
-            updateDisplay();
+            render();
         }
 
-        function renderMembers() {
+        // 画面描画
+        function render() {
+            document.getElementById('target-input').value = appData.target;
             const container = document.getElementById('members-container');
-            MEMBERS.forEach(name => {
+            container.innerHTML = '';
+
+            let totalDrunk = 0;
+
+            appData.members.forEach((member, index) => {
+                totalDrunk += member.count;
+
                 const div = document.createElement('div');
                 div.className = 'card';
                 div.innerHTML = `
-                    <div class="card-name">${name}</div>
-                    <button class="btn-add" onclick="drink('${name}')">＋</button>
+                    <div class="card-left">
+                        <span class="member-name" onclick="renameMember(${index})">${member.name} ✎</span>
+                        <span class="member-count">飲んだ量: ${member.count}杯</span>
+                    </div>
+                    <button class="btn-add" onclick="drink(${index})">＋</button>
                 `;
                 container.appendChild(div);
             });
-        }
 
-        function drink(name) {
-            currentCount++;
-            updateDisplay();
-
-            // 目標達成時のメッセージ送信
-            if (TARGET - currentCount <= 0) {
-                 sendLineMessage(`${name}の一撃で目標達成！！\n完飲お疲れ様でした！🍻`);
-            }
-        }
-
-        function updateDisplay() {
-            const remain = TARGET - currentCount;
-            document.getElementById('remain-display').innerText = remain > 0 ? remain : 0;
-            document.getElementById('target-display').innerText = TARGET;
-
+            // 残り杯数計算
+            const remain = appData.target - totalDrunk;
+            const header = document.getElementById('header-bg');
+            const remainDisplay = document.getElementById('remain-display');
+            
+            remainDisplay.innerText = remain > 0 ? remain : 0;
+            
             if (remain <= 0) {
-                document.getElementById('header').classList.add('celebration');
-                document.getElementById('remain-display').innerText = "達成";
+                header.classList.add('celebration');
+                remainDisplay.innerText = "達成!!";
+            } else {
+                header.classList.remove('celebration');
             }
         }
 
-        // LINEのトークルームにメッセージを送る機能
-        function sendLineMessage(text) {
-            if (liff.isInClient()) {
-                liff.sendMessages([{ type: 'text', text: text }])
-                    .then(() => console.log('Message sent'))
-                    .catch((err) => console.error('Error:', err));
+        // ▼ アクション関数群
+
+        // 1. 飲む
+        function drink(index) {
+            appData.members[index].count++;
+            saveData();
+            render();
+        }
+
+        // 2. LINEの名前で自分を追加
+        async function addMyself() {
+            try {
+                const profile = await liff.getProfile();
+                addMemberToList(profile.displayName);
+            } catch (err) {
+                alert("LINE情報の取得に失敗しました");
+            }
+        }
+
+        // 3. ゲスト追加（手動）
+        function addGuest() {
+            addMemberToList(`メンバー ${appData.members.length + 1}`);
+        }
+
+        // 共通追加ロジック
+        function addMemberToList(name) {
+            // 重複チェック（簡易）
+            const exists = appData.members.some(m => m.name === name);
+            if (!exists) {
+                appData.members.push({ name: name, count: 0 });
+                saveData();
+                render();
+            }
+        }
+
+        // 4. 名前を変える
+        function renameMember(index) {
+            const newName = prompt("新しい名前を入力:", appData.members[index].name);
+            if (newName) {
+                appData.members[index].name = newName;
+                saveData();
+                render();
+            }
+        }
+
+        // 5. 目標変更
+        function updateTarget() {
+            const val = document.getElementById('target-input').value;
+            appData.target = parseInt(val);
+            saveData();
+            render();
+        }
+
+        // 6. 全リセット
+        function resetAll() {
+            if(confirm("本当にリセットしますか？今の記録は消えます。")) {
+                appData.members = [];
+                appData.target = 30;
+                saveData();
+                render();
+            }
+        }
+
+        // ▼ データ保存・読込（Local Storage）
+        function saveData() {
+            localStorage.setItem('tequila_data', JSON.stringify(appData));
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('tequila_data');
+            if (saved) {
+                appData = JSON.parse(saved);
             }
         }
 
