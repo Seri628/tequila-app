@@ -13,12 +13,12 @@
         body { 
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             
-            /* ▼▼ 背景設定：CSSでメキシカンなストライプ柄を描画 ▼▼ */
+            /* ▼▼ 背景設定：メキシカン・サラペ風ストライプ ▼▼ */
             background-color: #111;
             background-image: 
-                /* 文字を読みやすくするための黒いフィルター（85%の濃さ） */
+                /* 文字を読みやすくするための黒いフィルター */
                 linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.95)),
-                /* メキシカン・サラペ風のストライプ */
+                /* カラフルなストライプ柄 */
                 repeating-linear-gradient(
                     135deg,
                     #c0392b, #c0392b 20px, /* 赤 */
@@ -39,7 +39,7 @@
             border-bottom: 1px solid #444; box-shadow: 0 5px 20px rgba(0,0,0,0.6);
         }
         
-        /* ヘッダー装飾用 */
+        /* ヘッダー装飾 */
         .total-info { display: flex; justify-content: center; align-items: center; gap: 5px; margin-bottom: 10px; }
         
         .remain-count { font-size: 4.5rem; font-weight: 900; color: #ff0055; text-shadow: 0 0 20px rgba(255, 0, 85, 0.6); line-height: 1; vertical-align: bottom; }
@@ -58,7 +58,7 @@
         .member-name { font-size: 1.2rem; font-weight: bold; display: block; margin-bottom: 4px; color: #fff; }
         .member-count { font-size: 0.85rem; color: #f1c40f; letter-spacing: 1px; }
         
-        /* ボタン装飾 */
+        /* ボタン装飾：テキーラグラス */
         .btn-add { 
             background: linear-gradient(135deg, #00b894, #00cec9); border: none; color: white; 
             width: 65px; height: 65px; border-radius: 50%; cursor: pointer; 
@@ -67,6 +67,7 @@
         }
         .btn-add:active { transform: scale(0.9); }
 
+        /* コントロールボタンエリア */
         .controls { margin: 15px 20px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
         .btn-ctrl { padding: 12px 20px; border-radius: 30px; border: none; font-weight: bold; cursor: pointer; font-size: 0.9rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); flex: 1; min-width: 100px; }
         
@@ -144,7 +145,9 @@
     </div>
 
     <script>
-        // ▼▼ 設定エリア（ここを書き換える！） ▼▼
+        // ▼▼ 設定エリア ▼▼
+        
+        // ★ご指定のLIFF IDを設定しました★
         const LIFF_ID = "2008790629-0ju0alVp"; 
         
         // ★ここに前回のFirebase設定を貼り付けてください★
@@ -179,9 +182,11 @@
                 }
             });
 
+            // LIFF初期化
             await liff.init({ liffId: LIFF_ID });
-            if (!liff.isLoggedIn()) {
-                liff.login();
+            // ※注意: ローカル(file://)で開くとここでエラーになりますが正常です。
+            if (liff.isLoggedIn()) {
+               console.log("Logged in");
             }
         }
 
@@ -196,6 +201,7 @@
                 totalDrunk += member.count;
                 const div = document.createElement('div');
                 div.className = 'card';
+                // ボタンを絵文字に変更
                 div.innerHTML = `
                     <div class="card-left">
                         <span class="member-name" onclick="renameMember(${index})">${member.name} ✎</span>
@@ -229,9 +235,17 @@
 
         async function addMyself() {
             try {
+                // LIFFログインチェック
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
                 const profile = await liff.getProfile();
                 addMemberToList(profile.displayName);
-            } catch (err) { alert("LINE情報の取得に失敗"); }
+            } catch (err) { 
+                console.error(err);
+                alert("LINE情報の取得に失敗しました。\n(サーバーにアップロードしてhttpsでアクセスしていますか？)"); 
+            }
         }
 
         function addGuest() { addMemberToList(`メンバー ${appData.members.length + 1}`); }
